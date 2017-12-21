@@ -1,10 +1,10 @@
 local BasePlugin = require "kong.plugins.base_plugin"
-local access = require "kong.plugins.up-jwt-handler.access"
+local access = require "kong.plugins.up-jwt-builder.access"
 
 local UpJwtHandler = BasePlugin:extend()
 
 function UpJwtHandler:new()
-  UpJwtHandler.super.new(self, "up-jwt-handler")
+  UpJwtHandler.super.new(self, "up-jwt-builder")
 end
 
 function UpJwtHandler:access(conf)

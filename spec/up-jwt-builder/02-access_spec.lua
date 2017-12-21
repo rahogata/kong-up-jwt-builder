@@ -18,7 +18,7 @@ describe("Upstream Jwt Builder (access)", function()
   		}
   	})
   	assert(helpers.start_kong({
-  	  trusted_ips       = "0.0.0.0/0, ::/0",
+	  custom_plugins = "up-jwt-builder",
       nginx_conf = "spec/fixtures/custom_nginx.template",
     }))
   end)
@@ -41,8 +41,11 @@ describe("Upstream Jwt Builder (access)", function()
   		method = "POST",
   		path = "/oauth/token",
   		body = {},
-  		headers = { ["x-authenticated_userid"] = "user=shiva2991,email=shiva20grk@gmail.com" }
-  		})
+  		headers = {
+  		 ["x-authenticated_userid"] = "user=shiva2991,email=shiva20grk@gmail.com",
+  		 host = "test1.com"
+  		}
+  	  })
   	  assert.response(r).has.status(200)
   	end)
   end)

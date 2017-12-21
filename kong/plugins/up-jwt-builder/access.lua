@@ -34,7 +34,7 @@ local function payload(conf, orig_header_value)
 --get actual value convert it to table
 -- for each claim name get it's value from table.
   local data = parse_json(orig_header_value)
-  if data == nil -- assume key=value pairs
+  if data == nil then -- assume key=value pairs
   	data = {}
   	for k, v in orig_header_value:gmatch'(%w+)=(%w+)' do
   		data[conf.dialect .. k] = v
@@ -81,3 +81,5 @@ function _M.execute(conf)
     end
   end
 end
+
+return _M
