@@ -6,7 +6,7 @@ describe("Upstream Jwt Builder (access)", function()
 
   setup(function()
   	helpers.run_migrations()
-  	local api1 = assert(helpers.dao.apis:insert { name = "api-1", hosts = { "test1.com" }, upstream_url = helpers.mock_upstream_url})
+  	local api1 = assert(helpers.dao.apis:insert { name = "api-1", uris = { "/oauth2/token" }, upstream_url = "http://127.0.0.1/"})
 
   	assert(helpers.dao.plugins:insert{
   		api_id = api1.id,
@@ -35,18 +35,34 @@ describe("Upstream Jwt Builder (access)", function()
   	if client then client:close() end
   end)
 
-  describe("send header", function()
-  	it("replace header to jwt token", function()
+  describe("send header as key=value pairs", function()
+  	it("replace key=value with jwt token", function()
   	  local r = assert( client:send{
   		method = "POST",
-  		path = "/oauth/token",
-  		body = {},
+  		path = "/oauth2/token",
+  		body = "",
   		headers = {
-  		 ["x-authenticated_userid"] = "user=shiva2991,email=shiva20grk@gmail.com",
-  		 host = "test1.com"
+  		 ["x-authenticated_userid"] = "user=rama,email=rama@ayodhya.com"
   		}
   	  })
   	  assert.response(r).has.status(200)
+  	  print(r.headers["x-authenticated_userid"])
+  	  assert.truthy(r.headers["x-authenticated_userid"])
+  	end)
+  end)
+
+  describe("send header as json", function()
+  	it("replace json with jwt token", function()
+  	  local r = assert( client:send{
+  	  	method = "POST",
+  	  	path = "/oauth2/token",
+  	  	body = "",
+  	  	headers = {
+  	  	  ["x-authenticated_userid"] = '{"user" : "rama", "email" : "rama@ayodhya.com"}'
+  		}
+  	  })
+  	  assert.response(r).has.status(200)
+  	  assert.truthy(r.headers["x-authenticated_userid"])
   	end)
   end)
 end)

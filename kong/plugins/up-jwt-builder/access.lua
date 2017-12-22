@@ -3,6 +3,8 @@ local req_get_headers = ngx.req.get_headers
 local req_set_header = ngx.req.set_header
 local string_find = string.find
 local ngx_time = ngx.time
+local cjson = require "cjson"
+local pcall = pcall
 
 local reserved_claims = {
     JWT_ISS = "iss",
@@ -16,7 +18,7 @@ local reserved_claims = {
 local _M = {}
 
 local function parse_json(header_value)
-  if body then
+  if header_value then
     local status, res = pcall(cjson.decode, header_value)
     if status then
       return res
@@ -31,19 +33,16 @@ end
 -- construct jwt payload
 -- orig_header_value comma separated claim=value pairs
 local function payload(conf, orig_header_value)
---get actual value convert it to table
--- for each claim name get it's value from table.
-  local data = parse_json(orig_header_value)
-  if data == nil then -- assume key=value pairs
-  	data = {}
-  	for k, v in orig_header_value:gmatch'(%w+)=(%w+)' do
+  local value = parse_json(orig_header_value)
+  local data = {}
+  if value == nil then -- assume key=value pairs
+  	for k, v in orig_header_value:gmatch'([^=]+)=*([^,]+),*' do
   		data[conf.dialect .. k] = v
   	end
   else
-	for k, v in pairs(data) do 
-	  data[conf.dialect .. k] = v
-	  data[k] = nil
-	end
+	  for k, v in pairs(value) do
+	    data[conf.dialect .. k] = v
+	  end
   end
   data[reserved_claims.JWT_ISS] = conf.issuer
   data[reserved_claims.JWT_AUD] = ngx.var.upstream_host
