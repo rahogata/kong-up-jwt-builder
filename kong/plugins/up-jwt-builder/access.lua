@@ -63,7 +63,7 @@ end
 
 function _M.execute(conf)
 
-  if ngx.ctx.authenticated_credential or conf.anonymous then
+  if ngx.ctx.authenticated_credential then
     -- we're authenticated so jwt added already or configured to be anonymous, 
     return
   end
