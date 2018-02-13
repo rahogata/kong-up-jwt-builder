@@ -7,6 +7,6 @@ return {
     dialect = { required = false, type = "string", default = "http://konghq.com/claims/" },
     issuer = { required = false, type = "string", default = "konghq.com/plugins/up-jwt-builder" },
     audience = { required = false, type = "string" },
-    expiration = { required = false, type = "number", default = 0 }
+    expiration = { required = false, type = "number"}
   }
 }
