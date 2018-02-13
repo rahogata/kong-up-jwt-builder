@@ -31,7 +31,7 @@ audience       |         | JWT aud claim.
 expiration     |         | JWT exp cliam in seconds.
 
 ## Notes
-1. Registered claims can be overwrite by the claims in the payload.
+1. Registered claims can be overwrite by the claims in the upstream header payload.
 
 This plugin was designed to work with the `kong-vagrant` 
 [development environment](https://github.com/Mashape/kong-vagrant). Please
