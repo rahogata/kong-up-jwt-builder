@@ -1,6 +1,16 @@
 local helpers = require "spec.helpers"
 local fixtures = require "spec.up-jwt-builder.fixtures"
 
+local function isjwt(jwt)
+  local res = 0
+  if jwt then
+    for w in jwt:gmatch'.' do
+      res = res + 1
+    end
+  end
+  return res ~= 0
+end
+
 describe("Upstream Jwt Builder (access)", function()
   local client
 
@@ -14,12 +24,12 @@ describe("Upstream Jwt Builder (access)", function()
   		config = {
   		key = fixtures.rsa256_private_key,
   		alg = "RS256",
-  		headers = {"x-authenticated_userid"}
+  		headers = {"x-powered-by"}
   		}
   	})
   	assert(helpers.start_kong({
 	    custom_plugins = "up-jwt-builder",
-      nginx_conf = "spec/fixtures/custom_nginx.template",
+      	    nginx_conf = "spec/fixtures/custom_nginx.template",
     }))
   end)
 
@@ -39,15 +49,17 @@ describe("Upstream Jwt Builder (access)", function()
   	it("replace key=value with jwt token", function()
   	  local r = assert( client:send{
   		method = "POST",
-  		path = "/request",
-  		body = "",
+  		path = "/post",
+  		body = {},
   		headers = {
-        host = "test1.com"
-  		 ["x-authenticated_userid"] = "user=rama,email=rama@ayodhya.com"
+                 host = "test1.com",
+  		 ["x-powered-by"] = "user=rama,email=rama@ayodhya.com",
+                 ["Content-Type"] = "application/json"
   		}
   	  })
   	  assert.response(r).has.status(200)
-  	  assert.truthy(r.headers["x-authenticated_userid"])
+      	  assert.response(r).has.header("x-powered-by")
+	  assert.truthy(isjwt(r.headers["x-powered-by"]))
   	end)
   end)
 
@@ -55,14 +67,17 @@ describe("Upstream Jwt Builder (access)", function()
   	it("replace json with jwt token", function()
   	  local r = assert( client:send{
   	  	method = "POST",
-  	  	path = "/request",
-  	  	body = "",
+  	  	path = "/post",
+  	  	body = {},
   	  	headers = {
-  	  	  ["x-authenticated_userid"] = '{"user" : "rama", "email" : "rama@ayodhya.com"}'
+                  host = "test1.com",
+  	  	  ["x-powered-by"] = '{"user" : "rama", "email" : "rama@ayodhya.com"}',
+                  ["Content-Type"] = "application/json"
   		}
   	  })
   	  assert.response(r).has.status(200)
-  	  assert.truthy(r.headers["x-authenticated_userid"])
+      	  assert.response(r).has.header("x-powered-by")
+	  assert.truthy(isjwt(r.headers["x-powered-by"]))
   	end)
   end)
 end)

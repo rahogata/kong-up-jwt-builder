@@ -2,6 +2,7 @@ local jwt_encoder = require "kong.plugins.up-jwt-builder.jwt_encoder"
 local req_get_headers = ngx.req.get_headers
 local req_set_header = ngx.req.set_header
 local ngx_time = ngx.time
+local string_gmatch = string.gmatch
 local cjson = require "cjson"
 local pcall = pcall
 
@@ -32,18 +33,19 @@ local function payload(conf, orig_header_value)
   data[reserved_claims.JWT_ISS] = conf.issuer
   data[reserved_claims.JWT_AUD] = conf.audience or ngx.var.upstream_host
   data[reserved_claims.JWT_IAT] = ngx_time()
-  data[reserved_claims.JWT_EXP] = conf.expiration and ngx_time() + conf.expiration or nil
+  data[reserved_claims.JWT_EXP] = conf.expiration and ngx_time() .. conf.expiration or nil
 
   local value = parse_json(orig_header_value)
-  local iter_function
-  if value == nil then -- assume key=value pairs
-  	iter_function = orig_header_value:gmatch'([^=]+)=*([^,]+),*'
+  local iter_func
+  if value == nil then --key=value pairs
+    iter_func = string_gmatch
+    value = orig_header_value
   else
-  	iter_function = pairs(value)
+    iter_func = pairs
   end
-  for k, v in iter_function do
-    data[conf.dialect .. k] = v
-  end
+    for k, v in iter_func(value, '([^=]+)=*([^,]+),*') do -- either takes value or pattern based on orig_header_value
+      data[conf.dialect .. k] = v
+    end
   return data
 end
 
@@ -61,10 +63,11 @@ end
 
 function _M.execute(conf)
 
-  if ngx.ctx.authenticated_credential or conf.anonymous ~= "" then
+  if ngx.ctx.authenticated_credential or conf.anonymous then
     -- we're authenticated so jwt added already or configured to be anonymous, 
     return
   end
+
   -- set jwt token to authentication request.
   setjwttoken(conf)
 end
