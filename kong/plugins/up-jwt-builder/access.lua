@@ -1,7 +1,6 @@
 local jwt_encoder = require "kong.plugins.up-jwt-builder.jwt_encoder"
 local req_get_headers = ngx.req.get_headers
 local req_set_header = ngx.req.set_header
-local string_find = string.find
 local ngx_time = ngx.time
 local cjson = require "cjson"
 local pcall = pcall
@@ -10,9 +9,7 @@ local reserved_claims = {
     JWT_ISS = "iss",
     JWT_AUD = "aud",
     JWT_EXP = "exp",
-    JWT_JTI = "jti",
-    JWT_IAT = "iat",
-    JWT_NBF = "nbf"
+    JWT_IAT = "iat"
 }
 
 local _M = {}
@@ -26,27 +23,27 @@ local function parse_json(header_value)
   end
 end
 
-local function header(conf)
-  return {typ = "JWT", alg = conf.alg}
-end
-
 -- construct jwt payload
 -- orig_header_value comma separated claim=value pairs
 local function payload(conf, orig_header_value)
-  local value = parse_json(orig_header_value)
+
   local data = {}
-  if value == nil then -- assume key=value pairs
-  	for k, v in orig_header_value:gmatch'([^=]+)=*([^,]+),*' do
-  		data[conf.dialect .. k] = v
-  	end
-  else
-	  for k, v in pairs(value) do
-	    data[conf.dialect .. k] = v
-	  end
-  end
+  -- add registered claims from the configuration, may be overwrite by header values
   data[reserved_claims.JWT_ISS] = conf.issuer
-  data[reserved_claims.JWT_AUD] = ngx.var.upstream_host
+  data[reserved_claims.JWT_AUD] = conf.audience or ngx.var.upstream_host
   data[reserved_claims.JWT_IAT] = ngx_time()
+  data[reserved_claims.JWT_EXP] = conf.expiration and ngx_time() + conf.expiration or nil
+
+  local value = parse_json(orig_header_value)
+  local iter_function
+  if value == nil then -- assume key=value pairs
+  	iter_function = orig_header_value:gmatch'([^=]+)=*([^,]+),*'
+  else
+  	iter_function = pairs(value)
+  end
+  for k, v in iter_function do
+    data[conf.dialect .. k] = v
+  end
   return data
 end
 
@@ -54,7 +51,7 @@ local function setjwttoken(conf)
   for i, name in ipairs(conf.headers) do
   	if req_get_headers()[name] then
       local data = payload(conf, req_get_headers()[name])
-      local token, err = jwt_encoder.encode(data, conf.key, conf.alg, header(conf))
+      local token, err = jwt_encoder.encode(data, conf.key, conf.alg)
       if token then
       	req_set_header(name, token)
       end
@@ -64,21 +61,12 @@ end
 
 function _M.execute(conf)
 
-  if ngx.ctx.authenticated_credential and conf.anonymous ~= "" then
-    -- we're already authenticated, and we're configured for using anonymous, 
-    -- hence we're in a logical OR between auth methods and we're already done.
+  if ngx.ctx.authenticated_credential or conf.anonymous ~= "" then
+    -- we're authenticated so jwt added already or configured to be anonymous, 
     return
   end
-
-  if ngx.req.get_method() == "POST" then
-    local uri = ngx.var.uri
-
-    local from, _ = string_find(uri, "/oauth2/token", nil, true)
-
-    if from then
-      setjwttoken(conf)
-    end
-  end
+  -- set jwt token to authentication request.
+  setjwttoken(conf)
 end
 
 return _M
