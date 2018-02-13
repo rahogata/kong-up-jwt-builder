@@ -30,7 +30,7 @@ issuer         |example.com/plugins/up-jwt-builder| JWT iss claim.
 audience       |         | JWT aud claim.
 expiration     |         | JWT exp cliam in seconds.
 
-## Notes
+### Notes
 1. Registered claims can be overwrite by the claims in the upstream header payload.
 
 This plugin was designed to work with the `kong-vagrant` 
