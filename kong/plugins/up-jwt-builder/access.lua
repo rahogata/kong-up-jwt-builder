@@ -1,4 +1,5 @@
 local jwt_encoder = require "kong.plugins.up-jwt-builder.jwt_encoder"
+local utils = require "kong.tools.utils"
 local req_get_headers = ngx.req.get_headers
 local req_set_header = ngx.req.set_header
 local ngx_time = ngx.time
@@ -10,7 +11,10 @@ local reserved_claims = {
     JWT_ISS = "iss",
     JWT_AUD = "aud",
     JWT_EXP = "exp",
-    JWT_IAT = "iat"
+    JWT_IAT = "iat",
+    JWT_SUB = "sub",
+    JWT_NBF = "nbf",
+    JWT_JTI = "jti"
 }
 
 local _M = {}
@@ -29,11 +33,6 @@ end
 local function payload(conf, orig_header_value)
 
   local data = {}
-  -- add registered claims from the configuration, may be overwrite by header values
-  data[reserved_claims.JWT_ISS] = conf.issuer
-  data[reserved_claims.JWT_AUD] = conf.audience or ngx.var.upstream_host
-  data[reserved_claims.JWT_IAT] = ngx_time()
-  data[reserved_claims.JWT_EXP] = conf.expiration and ngx_time() .. conf.expiration or nil
 
   local value = parse_json(orig_header_value)
   local iter_func
@@ -44,8 +43,15 @@ local function payload(conf, orig_header_value)
     iter_func = pairs
   end
     for k, v in iter_func(value, '([^=]+)=*([^,]+),*') do -- either takes value or pattern based on orig_header_value
-      data[conf.dialect .. k] = v
+      if not utils.table_contains(reserved_claims, k) then
+      	data[conf.dialect .. k] = v
+      end
     end
+  -- add registered claims from the configuration, may be overwrite by header values
+  data[reserved_claims.JWT_ISS] = data[reserved_claims.JWT_ISS] and data[reserved_claims.JWT_ISS] or conf.issuer
+  data[reserved_claims.JWT_AUD] = data[reserved_claims.JWT_AUD] and data[reserved_claims.JWT_AUD] or (conf.audience or ngx.var.upstream_host)
+  data[reserved_claims.JWT_IAT] = data[reserved_claims.JWT_IAT] and data[reserved_claims.JWT_IAT] or ngx_time()
+  data[reserved_claims.JWT_EXP] = data[reserved_claims.JWT_EXP] and data[reserved_claims.JWT_EXP] or (conf.expiration and ngx_time() + conf.expiration or nil)
   return data
 end
 
