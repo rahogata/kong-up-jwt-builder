@@ -1,15 +1,7 @@
 local helpers = require "spec.helpers"
-local fixtures = require "spec.up-jwt-builder.fixtures"
-
-local function isjwt(jwt)
-  local res = 0
-  if jwt then
-    for w in jwt:gmatch'.' do
-      res = res + 1
-    end
-  end
-  return res ~= 0
-end
+local fixtures = require "spec.03-plugins.17-jwt.fixtures"
+local jwt_parser = require "kong.plugins.jwt.jwt_parser"
+local ngx_time = ngx.time
 
 describe("Upstream Jwt Builder (access)", function()
   local client
@@ -22,9 +14,10 @@ describe("Upstream Jwt Builder (access)", function()
   		api_id = api1.id,
   		name = "up-jwt-builder",
   		config = {
-  		key = fixtures.rsa256_private_key,
+  		key = fixtures.rs256_private_key,
   		alg = "RS256",
-  		headers = {"x-powered-by"}
+  		headers = {"x-authenticated_userid"},
+		issuer = "tester"
   		}
   	})
   	assert(helpers.start_kong({
@@ -53,13 +46,14 @@ describe("Upstream Jwt Builder (access)", function()
   		body = {},
   		headers = {
                  host = "test1.com",
-  		 ["x-powered-by"] = "user=rama,email=rama@ayodhya.com",
+  		 ["x-authenticated_userid"] = "user=rama,email=rama@ayodhya.com",
                  ["Content-Type"] = "application/json"
   		}
   	  })
   	  assert.response(r).has.status(200)
-      	  assert.response(r).has.header("x-powered-by")
-	  assert.truthy(isjwt(r.headers["x-powered-by"]))
+          local token = assert.request(r).has.header("x-authenticated_userid")
+          local jwt = assert(jwt_parser:new(token))
+          assert.True(jwt:verify_signature(fixtures.rs256_public_key))
   	end)
   end)
 
@@ -71,13 +65,57 @@ describe("Upstream Jwt Builder (access)", function()
   	  	body = {},
   	  	headers = {
                   host = "test1.com",
-  	  	  ["x-powered-by"] = '{"user" : "rama", "email" : "rama@ayodhya.com"}',
+  	  	  ["x-authenticated_userid"] = '{"user" : "rama", "email" : "rama@ayodhya.com"}',
                   ["Content-Type"] = "application/json"
   		}
   	  })
   	  assert.response(r).has.status(200)
-      	  assert.response(r).has.header("x-powered-by")
-	  assert.truthy(isjwt(r.headers["x-powered-by"]))
+          local token = assert.request(r).has.header("x-authenticated_userid")
+          local jwt = assert(jwt_parser:new(token))
+          assert.True(jwt:verify_signature(fixtures.rs256_public_key))
   	end)
+  end)
+  
+  describe("send registered claims", function()
+    it("configured claims overwritten", function()
+	  local nbf = ngx_time() - 10
+  	  local r = assert( client:send{
+  	  	method = "POST",
+  	  	path = "/post",
+  	  	body = {},
+  	  	headers = {
+                  host = "test1.com",
+  	  	  ["x-authenticated_userid"] = '{"user" : "rama", "email" : "rama@ayodhya.com", "nbf" : ' .. nbf .. ', "iss" : "OverWrittenClaim"}',
+                  ["Content-Type"] = "application/json"
+  		}
+  	  })
+  	  assert.response(r).has.status(200)
+          local token = assert.request(r).has.header("x-authenticated_userid")
+          local jwt = assert(jwt_parser:new(token))
+          assert.True(jwt:verify_signature(fixtures.rs256_public_key))
+	  assert.True(jwt:verify_registered_claims({ "nbf" }))
+	  assert.True(jwt.claims["iss"] == "OverWrittenClaim")
+    end)
+  end)
+
+  describe("send header in invalid format", function()
+    it("default/configured jwt claims added", function()
+	  local nbf = ngx_time() - 10
+  	  local r = assert( client:send{
+  	  	method = "POST",
+  	  	path = "/post",
+  	  	body = {},
+  	  	headers = {
+                  host = "test1.com",
+  	  	  ["x-authenticated_userid"] = '{"user" : "rama", "email" : ""rama@ayodhya.com"}',
+                  ["Content-Type"] = "application/json"
+  		}
+  	  })
+  	  assert.response(r).has.status(200)
+          local token = assert.request(r).has.header("x-authenticated_userid")
+          local jwt = assert(jwt_parser:new(token))
+          assert.True(jwt:verify_signature(fixtures.rs256_public_key))
+	  assert.True(jwt.claims["iss"] == "tester")
+    end)
   end)
 end)

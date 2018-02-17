@@ -21,8 +21,6 @@ build = {
   modules = {
     ["kong.plugins."..pluginName..".handler"] = "kong/plugins/"..pluginName.."/handler.lua",
     ["kong.plugins."..pluginName..".schema"] = "kong/plugins/"..pluginName.."/schema.lua",
-    ["kong.plugins."..pluginName..".asn_sequence"] = "kong/plugins/"..pluginName.."/asn_sequence.lua",
-    ["kong.plugins."..pluginName..".jwt_encoder"] = "kong/plugins/"..pluginName.."/jwt_encoder.lua",
     ["kong.plugins."..pluginName..".access"] = "kong/plugins/"..pluginName.."/access.lua"
   }
 }

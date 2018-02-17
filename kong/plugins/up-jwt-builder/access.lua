@@ -1,4 +1,4 @@
-local jwt_encoder = require "kong.plugins.up-jwt-builder.jwt_encoder"
+local jwt_encoder = require "kong.plugins.jwt.jwt_parser"
 local utils = require "kong.tools.utils"
 local req_get_headers = ngx.req.get_headers
 local req_set_header = ngx.req.set_header
@@ -8,13 +8,13 @@ local cjson = require "cjson"
 local pcall = pcall
 
 local reserved_claims = {
-    JWT_ISS = "iss",
-    JWT_AUD = "aud",
-    JWT_EXP = "exp",
-    JWT_IAT = "iat",
-    JWT_SUB = "sub",
-    JWT_NBF = "nbf",
-    JWT_JTI = "jti"
+  ISS = "iss",
+  AUD = "aud",
+  EXP = "exp",
+  IAT = "iat",
+  SUB = "sub",
+  NBF = "nbf",
+  JTI = "jti"
 }
 
 local _M = {}
@@ -43,23 +43,29 @@ local function payload(conf, orig_header_value)
     iter_func = pairs
   end
     for k, v in iter_func(value, '([^=]+)=*([^,]+),*') do -- either takes value or pattern based on orig_header_value
-      if not utils.table_contains(reserved_claims, k) then
-      	data[conf.dialect .. k] = v
-      end
+      data[conf.dialect .. k] = v
     end
-  -- add registered claims from the configuration, may be overwrite by header values
-  data[reserved_claims.JWT_ISS] = data[reserved_claims.JWT_ISS] and data[reserved_claims.JWT_ISS] or conf.issuer
-  data[reserved_claims.JWT_AUD] = data[reserved_claims.JWT_AUD] and data[reserved_claims.JWT_AUD] or (conf.audience or ngx.var.upstream_host)
-  data[reserved_claims.JWT_IAT] = data[reserved_claims.JWT_IAT] and data[reserved_claims.JWT_IAT] or ngx_time()
-  data[reserved_claims.JWT_EXP] = data[reserved_claims.JWT_EXP] and data[reserved_claims.JWT_EXP] or (conf.expiration and ngx_time() + conf.expiration or nil)
+    for k, v in pairs(reserved_claims) do
+      data[v] = data[conf.dialect .. v]
+      data[conf.dialect .. v] = nil
+    end
+  -- add registered claims from the configuration, may overwrite by header values
+  data[reserved_claims.ISS] = data[reserved_claims.ISS] and data[reserved_claims.ISS] or conf.issuer
+  data[reserved_claims.AUD] = data[reserved_claims.AUD] and data[reserved_claims.AUD] or (conf.audience or ngx.var.upstream_host)
+  data[reserved_claims.IAT] = data[reserved_claims.IAT] and data[reserved_claims.IAT] or ngx_time()
+  data[reserved_claims.EXP] = data[reserved_claims.EXP] and data[reserved_claims.EXP] or (conf.expiration and ngx_time() + conf.expiration or nil)
   return data
 end
 
 local function setjwttoken(conf)
   for i, name in ipairs(conf.headers) do
-  	if req_get_headers()[name] then
+    if req_get_headers()[name] then
       local data = payload(conf, req_get_headers()[name])
       local token, err = jwt_encoder.encode(data, conf.key, conf.alg)
+      if err then
+        ngx.log(ngx.ERR, "Could not generate jwt.", err)
+        return
+      end
       if token then
       	req_set_header(name, token)
       end
