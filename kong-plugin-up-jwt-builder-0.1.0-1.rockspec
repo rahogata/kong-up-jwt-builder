@@ -9,7 +9,7 @@ source = {
 }
 
 description = {
-  summary = "My custom Kong plugin to construct JWT from configured header parameters to send it to upstream.",
+  summary = "A Kong plugin to send additional information after authentication as JWT in the upstream header provided by authentication plugins.",
   homepage = "https://github.com/shiva2991/kong-up-jwt-builder",
   license = "MIT"
 }

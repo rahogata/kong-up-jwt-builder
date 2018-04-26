@@ -12,7 +12,7 @@ function UpJwtHandler:access(conf)
   access.execute(conf)
 end
 
-UpJwtHandler.PRIORITY = 5000
+UpJwtHandler.PRIORITY = 500
 UpJwtHandler.VERSION = "0.1.0"
 
 return UpJwtHandler
